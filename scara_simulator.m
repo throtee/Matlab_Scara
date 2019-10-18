@@ -1,88 +1,120 @@
+function [q1,q2,q3,q4]=inverse_kinematics(T)
+%the problem can be describe as input the homogeneous transformation matrix of SCARA and get
+%the D-H variables of 'goal' position
 
-%-------------------------------
-%build scara robot
-%scara RRPR (three rotations and one position in order
-%DOF=4
-%-------------------------------
+%define as 'current' variables
+syms q1_C q2_C q3_C q4_C
+%define as 'goal' variables
+% syms q1 q2 q3 q4
+syms I1 I2 I3 I4
+I1=10; I2=10; I3=10; I4=10;
+% q1_C=0;q2_C=0;q3_C=0;q4_C=0;
+% q_sum=[q1,q2,q3,q4]';
+% q_sum_C=[q1_C,q2_C,q3_C,q4_C]';
+% T_IK=T_maker(q1,q2,q3,q4);
 
+%transform the 'current' matrix
+% T_sum_C=T_maker(q1_C,q2_C,q3_C,q4_C);
+
+%----------------------------------------------------------------
 %set the variables
+%the function is used for creating homogeneous transformation matrix
+L1=[q1_C 0 40 0];
+L2=[q2_C 0 40 0];
+L3=[0 q3_C 0 0 ];
+L4=[q4_C 20 0 0];
+L_SCARA=[L1;L2;L3;L4];
 
-%use Link command to create link
-L1=Link([pi/2 0 40 0 0]);
-L2=Link([-pi/2 0 40 0 0]);
-L3=Link([0 20 0 0 1 ]);
-L4=Link([pi/2 20 0 0 0]);
-%set offset for L1
-offset_variables=7;
-L1.offset=offset_variables;
-%assemble the robot
-SCARA=SerialLink([L1 L2 L3 L4],'name','SCARA1');
-%set the limitation,it will use default setting when not given this command
-SCARA.qlim=[-pi pi;-pi pi;0 100;-pi pi];
-%set the base
-SCARA.base=transl(0,0,30);
-%rotating 
-% SCARA.base=SCARA.base*trotx(pi);
+T_sum_C=eye(4);
 
+%create matrix
+for i=1:4
+    theta_tem=L_SCARA(i,1);
+    d_tem=L_SCARA(i,2);
+    a_tem=L_SCARA(i,3);
+    alpha_tem=L_SCARA(i,4);
+    
+    A_tem=[cos(theta_tem),-sin(theta_tem)*cos(alpha_tem),sin(theta_tem)*sin(alpha_tem),a_tem*cos(theta_tem);
+        sin(theta_tem),cos(theta_tem)*cos(alpha_tem),-cos(theta_tem)*sin(alpha_tem),a_tem*sin(theta_tem);
+        0,sin(alpha_tem),cos(alpha_tem),d_tem;
+        0,0,0,1];
+    
+ 
+    T_sum_C=T_sum_C*A_tem;
+end
+
+%--------------------------------------------------------------------------------------
+T_sum_C_T=[T_sum_C(1,1),T_sum_C(2,1),T_sum_C(1,2),T_sum_C(2,2),T_sum_C(3,2),T_sum_C(1,3),T_sum_C(2,3),T_sum_C(3,3),T_sum_C(1,4),T_sum_C(2,4),T_sum_C(3,4)]';
+Jacobian_T=jacobian([T_sum_C(1,1),T_sum_C(2,1),T_sum_C(1,2),T_sum_C(2,2),T_sum_C(3,2),T_sum_C(1,3),T_sum_C(2,3),T_sum_C(3,3),T_sum_C(1,4),T_sum_C(2,4),T_sum_C(3,4)],[q1_C,q2_C,q3_C,q4_C]);
+% q1_C=I1;q2_C=I2;q3_C=I3;q4_C=I4;
+% Jacobian_T_C=subs(Jacobian_T);
+T_T=[T(1,1),T(2,1),T(1,2),T(2,2),T(3,2),T(1,3),T(2,3),T(3,3),T(1,4),T(2,4),T(3,4)]';
+
+% T_result=T_sum_C_T+Jacobian_T*(q_sum-q_sum_C);
+
+%-----------------------------------------------------------------
+%IT SHOULD BUILD IN AS A ROTATION, IT IS THE RIGHT WAY MATHMATICALLY 
+q1_C=I1;q2_C=I2;q3_C=I3;q4_C=I4;
+
+Jacobian_Inverted=double(subs(Jacobian_T));
+% Jacobian_Inverted=subs(pinv(Jacobian_T)');
+Jacobian_Inverted_C=invert_SVD(Jacobian_Inverted);
+T_sum_C_T_T=subs(T_sum_C_T);
+
+% q_delta=Jacobian_Inverted_C*(T_T-T_sum_C_T_T);
+% 
+% while q_delta~=0
+% q_delta=Jacobian_Inverted_C*(T_T-T_sum_C_T_T);
+% q1_C=q1_C+q_delta(1); q2_C=q2_C+q_delta(2); q3_C=q3_C+q_delta(3); q3_C=q3_C+q_delta(3);
+% % Jacobian_Inverted=subs(pinv(Jacobian_T)');
+% % Jacobian_Inverted_C=subs(Jacobian_Inverted);
+% 
+% Jacobian_Inverted=double(subs(Jacobian_T));
+% Jacobian_Inverted_C=invert_SVD(Jacobian_Inverted);
+% T_sum_C_T_T=subs(T_sum_C_T);
+% end
+
+for i=1:100
+q_delta=Jacobian_Inverted_C*(T_T-T_sum_C_T_T);
+q1_C=double(q1_C+q_delta(1)); q2_C=double(q2_C+q_delta(2)); q3_C=double(q3_C+q_delta(3)); q4_C=double(q4_C+q_delta(4));
+% Jacobian_Inverted=subs(pinv(Jacobian_T)');
+% Jacobian_Inverted_C=subs(Jacobian_Inverted);
+
+Jacobian_Inverted=double(subs(Jacobian_T));
+Jacobian_Inverted_C=invert_SVD(Jacobian_Inverted);
+T_sum_C_T_T=subs(T_sum_C_T);
+end
+
+% q1_C=0;q2_C=0;q3_C=0;q4_C=0;
+
+% if abs(q_delta(1)/q_delta())
+    
 %------------------------------------------------------------------
 
-%plot
+q1=double(q1_C);q2=double(q2_C);q3=double(q3_C);q4=double(q4_C);
 
-%workplace is needed for setting the qlim(possibly
-%SCARA.plot([0 0 0 0],'workspace',[-120 120 -120 120 -120 120])
-%it is used when given the sepcific 'qlim'
-%SCARA.teach
-
-%---------------------------------------------------------------------
-
-%kinematics
-
-%forward kinematics,q1-4 for set the movement of 4 link,return the
-%homogeneous transformation matrix
-q1=0;
-q2=0;
-q3=0;
-q4=0;
-T=SCARA.fkine([q1 q2 q3 q4]);
-
-%reverse kinematics-closed-form solution
-%ikine6s is for 6DOF
-%left-right hand 'l','r'
-%elbow up-down 'u','d'
-%wrist flip-not 'f','n'
-%Because joint axes coincide, the degree of freedom is reduced which
-%creates singularity motion.The data of two joint may be random number, but
-%overall the sum of the two joint data is constant. It can be understood as
-%two joint connected as one.
-%exp: qz=p560.ikine6s(T,'rd');
-
-%for less than 6DOF a mask matrix must be apllied
-T_cfs=transl(40,65,130);
-q_cfs=SCARA.ikine(T_cfs,[0 0 0 0],[1 1 1 0 0 1]);
-%it will only consider x,y,z axis and alpha,other coordinates value is
-%wrong
-T_cfs_new=SCARA.fkine(q_cfs);
+end
 
 
-%------------------------
+% function T=invert_SVD(A)
+% [U,S,V] = svd(A);
+% %get S_plus-----------------------------------------------------------
+% S_plus=S;
+% S_1=S~=0;
+% S_2=1./S(S_1);
+% S_plus(S_1)=S_2;
+% %--------------------------------------------------------------------
+% T=V'*S_plus'*U;
+% end
 
-%set the trajectory
-
-%get the position and joint coordinates
-T1=transl(-100,100,50);
-T2=transl(-46,64,78);
-q1=SCARA.ikine(T1,[0 0 0 0],[1 1 1 0 0 1]);
-q2=SCARA.ikine(T2,[0 0 0 0],[1 1 1 0 0 1]);
-%set the time pulse
-t=(0:0.05:2)';
-
-q=mtraj(@tpoly,q1,q2,t);
-SCARA.plot(q,'workspace',[-120 120 -120 120 -120 120]);
-plot(t,q(:,2));
+function T=invert_SVD(A)
+T=pinv(A);
+end
 
 
 
 
-
+% function [q1,q2,q3,q4]=T_converge(T)
+% end
 
 
