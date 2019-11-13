@@ -48,10 +48,10 @@ end
 %construct the SCARA matrix
 
 %create link
-L1=[q1_C 0 40 0];
-L2=[q2_C 0 40 0];
+L1=[q1_C 0 425 0];
+L2=[q2_C 0 275 0];
 L3=[0 q3_C 0 0 ];
-L4=[q4_C 20 0 0];
+L4=[q4_C 160 0 0];
 L_SCARA=[L1;L2;L3;L4];
 
 %generate the default homogeneous transformation matrix
